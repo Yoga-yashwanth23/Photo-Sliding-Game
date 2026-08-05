@@ -1,0 +1,31 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1D6E8C"/>
+      <stop offset="1" stop-color="#0A1A2A"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="1200" fill="url(#sky)"/>
+  <circle cx="900" cy="260" r="120" fill="#EFE1C1" opacity="0.9"/>
+  <path d="M0 800 C 200 740, 400 860, 600 800 S 1000 740, 1200 800 L1200 1200 L0 1200 Z" fill="#123B4F"/>
+  <path d="M0 900 C 220 850, 420 950, 620 900 S 1000 850, 1200 900 L1200 1200 L0 1200 Z" fill="#0A1A2A"/>
+  <g transform="translate(600,760)">
+    <path d="M-260 40 L260 40 L210 130 L-210 130 Z" fill="#4A2E1C" stroke="#C9A15A" stroke-width="6"/>
+    <rect x="-6" y="-360" width="12" height="400" fill="#8a6a3a"/>
+    <path d="M6 -360 L 6 -120 L 220 -240 Z" fill="#EFE1C1"/>
+    <path d="M-6 -340 L -6 -140 L -180 -220 Z" fill="#D9C79C"/>
+    <circle cy="-380" r="8" fill="#B5502F"/>
+  </g>
+  <g transform="translate(600,1000)" opacity="0.95">
+    <circle r="150" fill="#EFE1C1" stroke="#8a6a3a" stroke-width="10"/>
+    <circle r="120" fill="none" stroke="#B5502F" stroke-width="3"/>
+    <g stroke="#8a6a3a" stroke-width="3">
+      <line x1="0" y1="-140" x2="0" y2="140"/>
+      <line x1="-140" y1="0" x2="140" y2="0"/>
+    </g>
+    <polygon points="0,-90 20,0 0,10" fill="#B5502F"/>
+    <polygon points="0,90 -20,0 0,-10" fill="#123B4F"/>
+    <text x="0" y="-100" text-anchor="middle" font-family="Georgia, serif" font-size="28" fill="#123B4F">N</text>
+  </g>
+  <text x="600" y="110" text-anchor="middle" font-family="Georgia, serif" font-size="46" fill="#EFE1C1" letter-spacing="8">TRUE NORTH</text>
+</svg>

@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-abyss text-parchment font-body antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-heading tracking-wide;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme('colors.gold');
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: theme('colors.gold');
+    color: theme('colors.abyss');
+  }
+}
+
+@layer components {
+  .plank-panel {
+    @apply bg-deep/80 shadow-plank rounded-xl border border-gold/30;
+  }
+
+  .parchment-panel {
+    @apply bg-parchment text-abyss rounded-lg shadow-seal;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-gold px-5 py-2.5
+      font-heading text-abyss tracking-wide transition-all duration-300 ease-fluid
+      hover:bg-gold-light hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foam;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-gold/60 px-5 py-2.5
+      font-heading text-parchment tracking-wide transition-all duration-300 ease-fluid
+      hover:bg-gold/10 hover:-translate-y-0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

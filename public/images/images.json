@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "name": "Uncharted Cove",
+    "path": "/images/1.png"
+  },
+  {
+    "id": 2,
+    "name": "Forgotten Atoll",
+    "path": "/images/1200-1.png"
+  },
+  {
+    "id": 3,
+    "name": "Kraken’s Reach",
+    "path": "/images/1500-1.png"
+  },
+  {
+    "id": 4,
+    "name": "Widow’s Cape",
+    "path": "/images/2.png"
+  },
+  {
+    "id": 5,
+    "name": "Skull Harbor",
+    "path": "/images/3.png"
+  },
+  {
+    "id": 6,
+    "name": "Siren’s Shoal",
+    "path": "/images/4.png"
+  },
+  {
+    "id": 7,
+    "name": "Gilded Lagoon",
+    "path": "/images/5.png"
+  },
+  {
+    "id": 8,
+    "name": "Storm Isle",
+    "path": "/images/6.png"
+  },
+  {
+    "id": 9,
+    "name": "Uncharted Cove",
+    "path": "/images/7.png"
+  },
+  {
+    "id": 10,
+    "name": "Forgotten Atoll",
+    "path": "/images/8.png"
+  },
+  {
+    "id": 11,
+    "name": "Kraken’s Reach",
+    "path": "/images/9.png"
+  },
+  {
+    "id": 12,
+    "name": "Widow’s Cape",
+    "path": "/images/900-1.png"
+  }
+]
