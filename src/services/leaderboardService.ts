@@ -134,9 +134,28 @@ class LocalLeaderboardService implements ILeaderboardService {
   }
 
   async submitResult(entry: Omit<LeaderboardEntry, 'id'>): Promise<LeaderboardEntry> {
-    const record: LeaderboardEntry = { ...entry, id: crypto.randomUUID() };
-    const entries = [...this.getRawEntries(), record];
-    storageService.set(STORAGE_KEYS.leaderboard, entries);
+    const rawEntries = this.getRawEntries();
+    const existingIndex = rawEntries.findIndex((e) => e.playerId === entry.playerId);
+    const existing = existingIndex !== -1 ? rawEntries[existingIndex] : null;
+
+    // One row per player: only overwrite the existing row when the new
+    // score beats it. If the new score is lower/equal, keep the old row
+    // as-is and just return it (no new row is ever added for a repeat play).
+    let record: LeaderboardEntry;
+    let entries: LeaderboardEntry[];
+
+    if (existing && entry.finalScore <= existing.finalScore) {
+      record = existing;
+      entries = rawEntries;
+    } else {
+      record = { ...entry, id: existing?.id ?? crypto.randomUUID() };
+      entries =
+        existingIndex !== -1
+          ? rawEntries.map((e, i) => (i === existingIndex ? record : e))
+          : [...rawEntries, record];
+      storageService.set(STORAGE_KEYS.leaderboard, entries);
+    }
+
     const allStatistics = storageService.get<Record<string, PlayerStatistics>>(STORAGE_KEYS.playerStatistics) ?? {};
     const stats = calculatePlayerStatistics(entries, record.playerId);
     if (stats) storageService.set(STORAGE_KEYS.playerStatistics, { ...allStatistics, [record.playerId]: stats });

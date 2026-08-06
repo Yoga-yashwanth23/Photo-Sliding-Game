@@ -35,7 +35,7 @@ export default function PuzzleBoard({ tiles, gridSize, imagePath, onTileClick }:
   const displayLabels = useMemo(() => buildDisplayLabelMap(gridSize * gridSize), [gridSize]);
 
   return (
-    <div ref={containerRef} className="mx-auto w-full max-w-2xl">
+    <div ref={containerRef} className="mx-auto w-full max-w-3xl">
       <div className="plank-panel relative mx-auto p-4" style={{ width: boardSize + 32 }}>
         {/* Torn treasure-map corner accents */}
         <span className="absolute -top-2 -left-2 h-6 w-6 rotate-45 bg-abyss border-b border-r border-gold/40" />

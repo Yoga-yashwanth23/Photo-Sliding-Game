@@ -13,6 +13,9 @@ import GameHeader from '@/components/GameHeader';
 import CompletionModal from '@/components/CompletionModal';
 import CompassLoader from '@/components/CompassLoader';
 import ConfirmModal from '@/components/ConfirmModal';
+import GameGuidelinesModal from '@/components/GameGuidelinesModal';
+import ReferenceMapPanel from '@/components/ReferenceMapPanel';
+import { MAX_MAP_REVEALS } from '@/constants';
 
 export default function Game() {
   const { imageId } = useParams<{ imageId: string }>();
@@ -23,10 +26,14 @@ export default function Game() {
   const hasSubmitted = useGameStore((s) => s.hasSubmitted);
   const finalRank = useGameStore((s) => s.finalRank);
   const markSubmitted = useGameStore((s) => s.markSubmitted);
+  const revealsUsed = useGameStore((s) => s.revealsUsed);
+  const useReveal = useGameStore((s) => s.useReveal);
+  const attemptId = useGameStore((s) => s.attemptId);
   const { submitResult } = useLeaderboardStore();
   const [images, setImages] = useState<PuzzleImage[]>([]);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [isPersonalBest, setIsPersonalBest] = useState(false);
+  const [showGuidelines, setShowGuidelines] = useState(true);
 
   const selectedImageId = imageId ? Number(imageId) : null;
 
@@ -61,6 +68,12 @@ export default function Game() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImageId, images.length]);
+
+  // Show the guidelines popup again whenever the player lands on a new map,
+  // so it always appears before they can start a fresh voyage.
+  useEffect(() => {
+    setShowGuidelines(true);
+  }, [selectedImageId]);
 
   useEffect(() => {
     async function persist() {
@@ -126,7 +139,9 @@ export default function Game() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12">
+    <div className="mx-auto max-w-6xl px-6 py-12">
+      <GameGuidelinesModal open={showGuidelines} onClose={() => setShowGuidelines(false)} />
+
       <GameHeader
         playerName={player?.name ?? 'Unknown'}
         elapsedMs={elapsedMs}
@@ -137,7 +152,39 @@ export default function Game() {
         onEndGame={handleEndGame}
       />
 
-      <PuzzleBoard tiles={tiles} gridSize={gridSize} imagePath={image.path} onTileClick={handleTileClick} />
+      <div
+        className={
+          showGuidelines
+            ? 'pointer-events-none select-none opacity-40 transition-opacity'
+            : 'transition-opacity'
+        }
+        aria-hidden={showGuidelines}
+      >
+        {/*
+          The reference panel is pinned to the page's top-right corner and
+          taken out of normal flow on wide screens, so it never competes
+          for space with the board — the board stays truly centered on the
+          page (and can run bigger) instead of being squeezed left by a
+          sidebar. Below `lg` there's no room for a floating corner panel,
+          so it drops back into normal flow, stacked above the board and
+          centered.
+        */}
+        <div className="relative mx-auto w-full">
+          <div className="mb-6 flex justify-center lg:absolute lg:top-0 lg:right-0 lg:mb-0 lg:block">
+            <ReferenceMapPanel
+              key={attemptId}
+              imagePath={image.path}
+              revealsUsed={revealsUsed}
+              maxReveals={MAX_MAP_REVEALS}
+              onReveal={useReveal}
+            />
+          </div>
+
+          <div className="flex w-full justify-center">
+            <PuzzleBoard tiles={tiles} gridSize={gridSize} imagePath={image.path} onTileClick={handleTileClick} />
+          </div>
+        </div>
+      </div>
 
       {isSolved && (
         <CompletionModal

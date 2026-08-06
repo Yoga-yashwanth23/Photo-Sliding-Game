@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { MoveQualityMetrics, PuzzleImage, Tile } from '@/types';
-import { GRID_SIZE, STORAGE_KEYS } from '@/constants';
+import { GRID_SIZE, MAX_MAP_REVEALS, STORAGE_KEYS } from '@/constants';
 import { shuffleTiles } from '@/utils/shuffle';
 import { storageService } from '@/services/storageService';
 
@@ -17,11 +17,19 @@ interface GameState {
   finalRank: number | null;
   moveQuality: MoveQualityMetrics;
   lastMovedTileId: number | null;
+  /** How many times the reference map has been revealed this attempt. Capped
+   *  at MAX_MAP_REVEALS and persisted so a page refresh can't reset it. */
+  revealsUsed: number;
+  /** Increments on every startGame call. Lets UI components (like the map
+   *  reveal panel) reset their own local state on "Play Again", even when
+   *  the puzzle image itself stays the same. */
+  attemptId: number;
 
   startGame: (image: PuzzleImage) => void;
   moveTile: (tileId: number) => void;
   resetGame: () => void;
   markSubmitted: (rank: number | null) => void;
+  useReveal: () => boolean;
 }
 
 interface PersistedSession {
@@ -36,6 +44,7 @@ interface PersistedSession {
   finalRank: number | null;
   moveQuality: MoveQualityMetrics;
   lastMovedTileId: number | null;
+  revealsUsed: number;
 }
 
 function isAdjacent(a: Tile, b: Tile): boolean {
@@ -77,6 +86,7 @@ function persistSession(state: GameState) {
     finalRank: state.finalRank,
     moveQuality: state.moveQuality,
     lastMovedTileId: state.lastMovedTileId,
+    revealsUsed: state.revealsUsed,
   };
   storageService.set(STORAGE_KEYS.gameSession, session);
 }
@@ -98,6 +108,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   finalRank: restored?.finalRank ?? null,
   moveQuality: restored?.moveQuality ?? { productiveMoves: 0, repeatedMoves: 0, reversals: 0, correctPlacements: 0 },
   lastMovedTileId: restored?.lastMovedTileId ?? null,
+  revealsUsed: restored?.revealsUsed ?? 0,
+  attemptId: 0,
 
   startGame: (image) => {
     const next: GameState = {
@@ -112,6 +124,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       finalRank: null,
       moveQuality: { productiveMoves: 0, repeatedMoves: 0, reversals: 0, correctPlacements: 0 },
       lastMovedTileId: null,
+      revealsUsed: 0,
+      attemptId: get().attemptId + 1,
     };
     set(next);
     persistSession(next);
@@ -170,6 +184,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     persistSession(next);
   },
 
+  /** Attempts to spend one map reveal. Returns whether it was allowed, so the
+   *  caller only shows the image when a reveal was actually granted. */
+  useReveal: () => {
+    const { revealsUsed } = get();
+    if (revealsUsed >= MAX_MAP_REVEALS) return false;
+    const next: GameState = { ...get(), revealsUsed: revealsUsed + 1 };
+    set(next);
+    persistSession(next);
+    return true;
+  },
+
   resetGame: () => {
     const next: GameState = {
       ...get(),
@@ -183,6 +208,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       finalRank: null,
       moveQuality: { productiveMoves: 0, repeatedMoves: 0, reversals: 0, correctPlacements: 0 },
       lastMovedTileId: null,
+      revealsUsed: 0,
     };
     set(next);
     storageService.remove(STORAGE_KEYS.gameSession);
