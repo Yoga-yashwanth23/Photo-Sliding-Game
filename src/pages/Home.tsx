@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { PuzzleImage } from '@/types';
 import { usePlayerStore } from '@/store/playerStore';
-import MapCard from '@/components/MapCard';
+import MapCarousel from '@/components/MapCarousel';
 import { pickRandom } from '@/utils/pickRandom';
 
 export default function Home() {
@@ -21,13 +21,9 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <h1 className="mb-2 text-center text-3xl">Chart Your Voyage, {player?.name}</h1>
-      <p className="mb-10 text-center text-foam/70">Choose a map to begin restoring, then slide the pieces into place.</p>
+      <p className="mb-10 text-center text-foam/70">Scroll sideways to browse the maps, then play the one you land on.</p>
 
-      <div className="mx-auto grid max-w-3xl gap-8 sm:grid-cols-2">
-        {images.map((image) => (
-          <MapCard key={image.id} image={image} />
-        ))}
-      </div>
+      <MapCarousel images={images} />
     </div>
   );
 }

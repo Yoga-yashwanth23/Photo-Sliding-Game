@@ -18,9 +18,6 @@ export default function Landing() {
         <Link to="/leaderboard" className="btn-outline">
           Leaderboard
         </Link>
-        <Link to="/about" className="btn-outline">
-          How To Play
-        </Link>
       </div>
     </div>
   );

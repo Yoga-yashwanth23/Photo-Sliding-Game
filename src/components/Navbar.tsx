@@ -43,7 +43,6 @@ export default function Navbar() {
         <div className="hidden items-center gap-6 text-sm md:flex">
           {navLink('/home', 'Home')}
           {navLink('/leaderboard', 'Leaderboard')}
-          {navLink('/about', 'How To Play')}
           {player ? (
             <div className="flex items-center gap-3 border-l border-gold/30 pl-6">
               <span className="font-mono text-xs text-foam">⚓ {player.name}</span>
@@ -99,7 +98,6 @@ export default function Navbar() {
             <div className="flex flex-col gap-4 px-6 py-5 text-base">
               {navLink('/home', 'Home')}
               {navLink('/leaderboard', 'Leaderboard')}
-              {navLink('/about', 'How To Play')}
               {player ? (
                 <div className="flex items-center justify-between border-t border-gold/20 pt-4">
                   <span className="font-mono text-xs text-foam">⚓ {player.name}</span>

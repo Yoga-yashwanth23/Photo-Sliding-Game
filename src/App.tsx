@@ -9,7 +9,6 @@ import Login from '@/pages/Login';
 import Home from '@/pages/Home';
 import Game from '@/pages/Game';
 import LeaderboardPage from '@/pages/LeaderboardPage';
-import About from '@/pages/About';
 
 function RequireCaptain({ children }: { children: React.ReactElement }) {
   const player = usePlayerStore((s) => s.player);
@@ -64,7 +63,6 @@ function AnimatedRoutes() {
           }
         />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
-        <Route path="/about" element={<About />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </motion.div>

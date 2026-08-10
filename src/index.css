@@ -15,6 +15,9 @@
 
   body {
     @apply bg-abyss text-parchment font-body antialiased;
+    /* Safety net: nothing on the site should ever cause horizontal
+       scrolling/overflow on narrow (mobile) viewports. */
+    overflow-x: hidden;
   }
 
   h1,

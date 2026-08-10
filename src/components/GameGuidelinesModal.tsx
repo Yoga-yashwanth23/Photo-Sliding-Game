@@ -101,6 +101,15 @@ export default function GameGuidelinesModal({ open, onClose }: GameGuidelinesMod
                 <p>The timer starts automatically on your first move and stops the instant the puzzle is solved. Every tile movement increases your move count — plan ahead, and avoid unnecessary back-and-forth.</p>
               </Section>
 
+              <Section title="🗺️ Reveal Map">
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>Tap the "Reveal Map" button above the board to peek at the completed image.</li>
+                  <li>Each peek shows the full picture for 4 seconds, then it hides itself again automatically.</li>
+                  <li>You get a limited number of reveals per voyage — use them wisely.</li>
+                  <li>Once you've used them all, the button disables until you start a new attempt.</li>
+                </ul>
+              </Section>
+
               <Section title="⭐ How Your Score Is Calculated">
                 <p className="mb-2">Your Final Score is out of 100, made up of three metrics:</p>
                 <ul className="list-disc space-y-1 pl-5">
