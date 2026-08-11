@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, Route, BrowserRouter, Routes, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { usePlayerStore } from '@/store/playerStore';
@@ -9,6 +10,7 @@ import Login from '@/pages/Login';
 import Home from '@/pages/Home';
 import Game from '@/pages/Game';
 import LeaderboardPage from '@/pages/LeaderboardPage';
+import { unlockAudio, playButtonClickSound } from '@/services/soundService';
 
 function RequireCaptain({ children }: { children: React.ReactElement }) {
   const player = usePlayerStore((s) => s.player);
@@ -70,6 +72,42 @@ function AnimatedRoutes() {
 }
 
 export default function App() {
+  // Play the button-click sound for every <button> in the app, in one place,
+  // instead of wiring it into each button individually. A capture-phase
+  // listener on window fires the instant the click happens — same tick as
+  // the button's own onClick — so there's no perceptible delay. Puzzle
+  // tiles are skipped (via data-no-click-sound) because they already play
+  // their own slide sound on click, triggered from the game store.
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const button = target?.closest('button');
+      if (!button || button.hasAttribute('data-no-click-sound') || button.disabled) return;
+      playButtonClickSound();
+    };
+    window.addEventListener('click', handleClick, true);
+    return () => window.removeEventListener('click', handleClick, true);
+  }, []);
+
+  // Unlock audio playback on the very first tap/click/keypress anywhere in
+  // the app. Without this, some mobile browsers (iOS Safari in particular)
+  // silently drop the very first tile-slide sound because it's the first
+  // audio playback attempt on the page. One-time listener, removed after it
+  // fires once.
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      unlockAudio();
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+    window.addEventListener('pointerdown', handleFirstInteraction);
+    window.addEventListener('keydown', handleFirstInteraction);
+    return () => {
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, []);
+
   return (
     <BrowserRouter>
       <div className="relative min-h-screen overflow-x-hidden">

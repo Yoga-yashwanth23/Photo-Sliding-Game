@@ -30,6 +30,11 @@ export default function PuzzleTile({ tile, gridSize, imagePath, tileSizePx, onCl
       type="button"
       onClick={() => onClick(tile.id)}
       layout
+      // Tile moves already play their own slide sound (triggered from the
+      // store, not from this click) — this attribute tells the app-wide
+      // button-click sound handler to skip this element so the two sounds
+      // never fire together on the same click.
+      data-no-click-sound="true"
       transition={{ type: 'spring', stiffness: 500, damping: 32 }}
       style={{
         gridRowStart: tile.row + 1,

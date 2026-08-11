@@ -3,6 +3,7 @@ import type { MoveQualityMetrics, PuzzleImage, Tile } from '@/types';
 import { GRID_SIZE, MAX_MAP_REVEALS, STORAGE_KEYS } from '@/constants';
 import { shuffleTiles } from '@/utils/shuffle';
 import { storageService } from '@/services/storageService';
+import { playSlideSound, playVictorySound } from '@/services/soundService';
 
 interface GameState {
   image: PuzzleImage | null;
@@ -140,6 +141,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!emptyTile || !targetTile || targetTile.isEmpty) return;
     if (!isAdjacent(emptyTile, targetTile)) return;
 
+    // Fire the slide sound in the same synchronous tick as the tile swap
+    // below, right after we know the move is actually legal (not on clicks
+    // that get rejected above). The pool in soundService is pre-loaded, so
+    // this call starts playback immediately with no load delay.
+    playSlideSound();
+
     const nextTiles = tiles.map((t) => ({ ...t }));
     const empty = nextTiles.find((t) => t.isEmpty)!;
     const target = nextTiles.find((t) => t.id === tileId)!;
@@ -163,6 +170,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     };
 
     const solved = nextTiles.every((t) => t.row === t.correctRow && t.col === t.correctCol);
+
+    // Fire the victory chime the instant the puzzle is confirmed solved —
+    // same synchronous tick as the "solved" state flipping to true, so the
+    // sound and the win state land together with no delay. moveTile's guard
+    // at the top (`if (isSolved) return`) means this can only ever fire once
+    // per completed game, exactly on the move that completes the picture.
+    if (solved) {
+      playVictorySound();
+    }
 
     const next: GameState = {
       ...get(),
