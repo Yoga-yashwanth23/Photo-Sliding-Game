@@ -78,11 +78,17 @@ export default function App() {
   // the button's own onClick — so there's no perceptible delay. Puzzle
   // tiles are skipped (via data-no-click-sound) because they already play
   // their own slide sound on click, triggered from the game store.
+  //
+  // A few CTAs (Landing's "Play Now"/"Leaderboard", Navbar's "Set Sail")
+  // are React Router <Link> elements styled as buttons (btn-gold/
+  // btn-outline) rather than real <button> elements, since they navigate
+  // via an href instead of an onClick handler — so the selector matches
+  // those too, not just <button>.
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
-      const button = target?.closest('button');
-      if (!button || button.hasAttribute('data-no-click-sound') || button.disabled) return;
+      const el = target?.closest('button, a.btn-gold, a.btn-outline');
+      if (!el || el.hasAttribute('data-no-click-sound') || (el as HTMLButtonElement).disabled) return;
       playButtonClickSound();
     };
     window.addEventListener('click', handleClick, true);
