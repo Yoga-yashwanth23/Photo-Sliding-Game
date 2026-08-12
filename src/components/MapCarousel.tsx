@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
@@ -27,6 +27,7 @@ export default function MapCarousel({ images }: MapCarouselProps) {
   const [[activeIndex, direction], setActive] = useState<[number, number]>([0, 0]);
   const [launchingId, setLaunchingId] = useState<number | null>(null);
   const lastWheelAt = useRef(0);
+  const swipeAreaRef = useRef<HTMLDivElement>(null);
 
   const activeImage = images[activeIndex];
 
@@ -41,20 +42,40 @@ export default function MapCarousel({ images }: MapCarouselProps) {
     else if (info.offset.x >= SWIPE_THRESHOLD) goTo(activeIndex - 1);
   }
 
-  function handleWheel(e: React.WheelEvent) {
-    // Trackpads report a sideways swipe as deltaX; ignore plain vertical
-    // scrolling so the page can still scroll normally.
-    if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) return;
-    const now = Date.now();
-    if (now - lastWheelAt.current < WHEEL_COOLDOWN_MS) return;
-    if (e.deltaX > 10) {
-      lastWheelAt.current = now;
-      goTo(activeIndex + 1);
-    } else if (e.deltaX < -10) {
-      lastWheelAt.current = now;
-      goTo(activeIndex - 1);
+  // Wheel/trackpad handling has to be a NATIVE (non-passive) listener,
+  // not React's onWheel prop. React attaches onWheel as a passive
+  // listener by default, so e.preventDefault() inside it is silently
+  // ignored — meaning the browser's own "swipe to go back/forward"
+  // history-navigation gesture would still fire underneath the
+  // carousel's own slide animation. That's what caused a left-swipe to
+  // both move the carousel AND navigate back to the previous page.
+  useEffect(() => {
+    const el = swipeAreaRef.current;
+    if (!el) return;
+
+    function onWheel(e: WheelEvent) {
+      // Trackpads report a sideways swipe as deltaX; ignore plain
+      // vertical scrolling so the page can still scroll normally.
+      if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) return;
+      // Consume the gesture so the browser doesn't also treat it as
+      // back/forward navigation.
+      e.preventDefault();
+      e.stopPropagation();
+      const now = Date.now();
+      if (now - lastWheelAt.current < WHEEL_COOLDOWN_MS) return;
+      if (e.deltaX > 10) {
+        lastWheelAt.current = now;
+        goTo(activeIndex + 1);
+      } else if (e.deltaX < -10) {
+        lastWheelAt.current = now;
+        goTo(activeIndex - 1);
+      }
     }
-  }
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex, launchingId, images.length]);
 
   function handlePlay() {
     if (!activeImage || launchingId !== null) return;
@@ -69,8 +90,9 @@ export default function MapCarousel({ images }: MapCarouselProps) {
   return (
     <div className="mx-auto w-full max-w-xl">
       <div
+        ref={swipeAreaRef}
         className="relative aspect-square w-full touch-pan-y overflow-hidden rounded-xl border border-gold/30 bg-abyss/60"
-        onWheel={handleWheel}
+        style={{ overscrollBehaviorX: 'contain' }}
       >
         <AnimatePresence initial={false} custom={direction} mode="popLayout">
           <motion.div

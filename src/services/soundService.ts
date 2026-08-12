@@ -30,9 +30,9 @@
 const POOL_SIZE = 6;
 const VOLUME = 1.0;
 // "Sword sliding" tile-move sound — boosted up from its previous level.
-const SLIDE_GAIN = 0.75;
+const SLIDE_GAIN = 1.8;
 // "Bubble" button-click sound — turned down from its previous, louder level.
-const CLICK_GAIN = 0.15;
+const CLICK_GAIN = 1.1;
 
 interface SoundPool {
   play: () => void;

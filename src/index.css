@@ -18,6 +18,12 @@
     /* Safety net: nothing on the site should ever cause horizontal
        scrolling/overflow on narrow (mobile) viewports. */
     overflow-x: hidden;
+    /* Stop the browser from treating a horizontal swipe/trackpad
+       gesture as "swipe to go back / forward" in history. Without
+       this, a left/right swipe over a swipeable element (like the
+       map carousel) can get hijacked by the browser's native
+       back-navigation gesture instead of being handled by the app. */
+    overscroll-behavior-x: none;
   }
 
   h1,
