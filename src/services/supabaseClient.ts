@@ -18,6 +18,12 @@ if (!isSupabaseConfigured) {
   );
 }
 
-// Safe to construct even with empty strings when not configured: the
-// client is simply never used in that case (see leaderboardService.ts).
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '');
+// createClient() throws synchronously ("supabaseUrl is required.") if given
+// an empty string — and this file is imported unconditionally by
+// leaderboardService.ts, so that throw happens at module-load time, before
+// React ever renders. That crashes the whole app to a blank screen with no
+// error boundary able to catch it. Falling back to a syntactically-valid
+// placeholder avoids the crash; the client is never actually called against
+// it because leaderboardService.ts only uses SupabaseLeaderboardService when
+// isSupabaseConfigured is true.
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder-anon-key');
