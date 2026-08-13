@@ -2,6 +2,8 @@ import type { LeaderboardEntry, LeaderboardFilters, Player, PlayerStatistics } f
 import { storageService } from './storageService';
 import { STORAGE_KEYS } from '@/constants';
 import { calculatePlayerStatistics } from '@/utils/scoringEngine';
+import { isSupabaseConfigured } from './supabaseClient';
+import { supabaseLeaderboardService } from './supabaseLeaderboardService';
 
 export type LeaderboardListener = (entries: LeaderboardEntry[]) => void;
 
@@ -189,4 +191,10 @@ class LocalLeaderboardService implements ILeaderboardService {
   }
 }
 
-export const leaderboardService: ILeaderboardService = new LocalLeaderboardService();
+// Swaps to Supabase automatically once VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+// are set (see .env.example and supabase/schema.sql). Falls back to the
+// local/device-only implementation otherwise, so the app still runs with
+// zero configuration.
+export const leaderboardService: ILeaderboardService = isSupabaseConfigured
+  ? supabaseLeaderboardService
+  : new LocalLeaderboardService();
