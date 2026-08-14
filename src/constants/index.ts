@@ -7,12 +7,6 @@ export const EXPECTED_MINIMUM_MOVES = 42;
 /** How many times a player may reveal the reference map per puzzle attempt. */
 export const MAX_MAP_REVEALS = 2;
 
-export const PLAYER_NAME_RULES = {
-  minLength: 3,
-  maxLength: 20,
-  pattern: /^[A-Za-z0-9_]+$/,
-};
-
 export const STORAGE_KEYS = {
   currentPlayer: 'ppq:player',
   theme: 'ppq:theme',

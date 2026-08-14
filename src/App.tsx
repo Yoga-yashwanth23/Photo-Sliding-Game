@@ -6,15 +6,18 @@ import Navbar from '@/components/Navbar';
 import OceanBackground from '@/components/OceanBackground';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import Landing from '@/pages/Landing';
-import Login from '@/pages/Login';
 import Home from '@/pages/Home';
 import Game from '@/pages/Game';
 import LeaderboardPage from '@/pages/LeaderboardPage';
 import { unlockAudio, playButtonClickSound } from '@/services/soundService';
 
 function RequireCaptain({ children }: { children: React.ReactElement }) {
+  // There's no login page anymore — a player is created automatically the
+  // moment someone clicks "Get Started" / "Set Sail" (see useStartVoyage).
+  // If somehow no player exists yet, send them back to the landing page,
+  // which is the only place that can create one.
   const player = usePlayerStore((s) => s.player);
-  if (!player) return <Navigate to="/login" replace />;
+  if (!player) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -47,7 +50,6 @@ function AnimatedRoutes() {
     >
       <Routes location={location}>
         <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
         <Route
           path="/home"
           element={
@@ -79,8 +81,8 @@ export default function App() {
   // tiles are skipped (via data-no-click-sound) because they already play
   // their own slide sound on click, triggered from the game store.
   //
-  // A few CTAs (Landing's "Play Now"/"Leaderboard", Navbar's "Set Sail")
-  // are React Router <Link> elements styled as buttons (btn-gold/
+  // A few CTAs (Landing's "Leaderboard", Navbar's "Set Sail" when it's a
+  // <Link>) are React Router <Link> elements styled as buttons (btn-gold/
   // btn-outline) rather than real <button> elements, since they navigate
   // via an href instead of an onClick handler — so the selector matches
   // those too, not just <button>.

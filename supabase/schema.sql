@@ -1,60 +1,66 @@
--- Pirate Puzzle Quest — leaderboard table
--- Run this in Supabase: Project -> SQL Editor -> New query -> paste -> Run.
+-- Pirate Puzzle Quest — game2_scores table
 --
--- Your existing "Slide_Puzzle" table's columns (Rank, Time as `time`,
--- Pirate Rank as int4, a separate Date) don't line up with what the app
--- actually produces (see src/types/index.ts -> LeaderboardEntry): Rank is
--- computed client-side and shouldn't be stored, completion time is a
--- duration in milliseconds not a clock time, and pirateRank is a text
--- label like "🦜 Captain", not a number. Easiest fix is a fresh table
--- rather than reshaping the old one. If you want to keep the old table
--- around, just drop it manually first:
---   drop table if exists public."Slide_Puzzle";
+-- This documents the table as it now actually exists in Supabase (you
+-- created it directly — see the CREATE TABLE you provided). It replaces
+-- the old public.leaderboard table this file used to describe; the app's
+-- Supabase service (src/services/supabaseLeaderboardService.ts) now talks
+-- to game2_scores instead. Re-running the CREATE TABLE below is a no-op if
+-- the table already exists (IF NOT EXISTS); it's here for reference/setting
+-- up a fresh environment, not something you need to run again.
+--
+-- Key differences from the old `leaderboard` table:
+--   - One row per *authenticated Zephoria user* (zephoria_user_id, unique,
+--     FK -> auth.users), not per anonymous locally-generated player id.
+--   - player_id is now nullable/legacy — no longer the upsert key.
+--   - This game does not perform its own login; it expects a Supabase Auth
+--     session (from the shared Zephoria login) to already exist when it
+--     loads, and reads the user via supabase.auth.getUser().
 
-create table if not exists public.leaderboard (
-  id uuid primary key default gen_random_uuid(),
-  player_id uuid not null,
+create table if not exists public.game2_scores (
   player_name text not null,
-  completion_time_ms bigint not null,
-  moves integer not null,
-  final_score numeric not null,
-  expected_minimum_moves integer not null,
-  move_efficiency numeric not null,
-  time_score numeric not null,
-  accuracy_score numeric not null,
-  pirate_rank text not null,
-  letter_grade text not null,
-  completed_at bigint not null,
-  created_at timestamptz not null default now(),
-  -- One row per player (the app upserts: only overwrites when the new
-  -- score is better), matching today's localStorage behaviour.
-  constraint leaderboard_player_id_key unique (player_id)
+  created_at timestamp with time zone not null default now(),
+  player_id uuid null,
+  completion_time_ms bigint null,
+  moves integer null,
+  final_score numeric null default 0,
+  expected_minimum_moves integer null,
+  move_efficiency numeric null,
+  time_score numeric null,
+  accuracy_score numeric null,
+  pirate_rank text null,
+  letter_grade text null,
+  completed_at bigint null,
+  constraint game2_scores_pkey primary key (id),
+  constraint game2_scores_user_unique unique (zephoria_user_id),
+  constraint game2_scores_user_fk foreign key (zephoria_user_id) references auth.users (id) on delete cascade
 );
 
--- Row Level Security: on by default for new Supabase tables. This app has
--- no login/auth (just a display name), so there's no server-side way to
--- tell "your" row from anyone else's — these policies open read/write to
--- anyone with the public anon key, same trust level as the localStorage
--- version had. Fine for a casual leaderboard; anyone could in principle
--- write a bogus score via the API. If that matters later, add Supabase
--- Auth and scope the insert/update policies to auth.uid().
-alter table public.leaderboard enable row level security;
+create index if not exists idx_game2_scores_user on public.game2_scores using btree (zephoria_user_id);
 
-drop policy if exists "Public read access" on public.leaderboard;
+-- Row Level Security: now that every row is tied to a real authenticated
+-- user, scope reads/writes to that user's own row instead of leaving the
+-- table open to anyone with the anon key (which is what the old, auth-less
+-- `leaderboard` table policies did). Leaderboard/statistics reads that need
+-- to see *other* players' scores (Leaderboard.tsx, getEntries) rely on the
+-- public-read policy below — tighten this if the leaderboard should only be
+-- visible to logged-in users.
+alter table public.game2_scores enable row level security;
+
+drop policy if exists "Public read access" on public.game2_scores;
 create policy "Public read access"
-  on public.leaderboard for select
+  on public.game2_scores for select
   using (true);
 
-drop policy if exists "Public insert access" on public.leaderboard;
-create policy "Public insert access"
-  on public.leaderboard for insert
-  with check (true);
+drop policy if exists "Users insert their own score" on public.game2_scores;
+create policy "Users insert their own score"
+  on public.game2_scores for insert
+  with check (auth.uid() = zephoria_user_id);
 
-drop policy if exists "Public update access" on public.leaderboard;
-create policy "Public update access"
-  on public.leaderboard for update
-  using (true)
-  with check (true);
+drop policy if exists "Users update their own score" on public.game2_scores;
+create policy "Users update their own score"
+  on public.game2_scores for update
+  using (auth.uid() = zephoria_user_id)
+  with check (auth.uid() = zephoria_user_id);
 
 -- Realtime: lets every open tab/device see new scores immediately,
 -- replacing the BroadcastChannel trick the local version used. Only add
@@ -66,8 +72,33 @@ begin
     select 1 from pg_publication_tables
     where pubname = 'supabase_realtime'
       and schemaname = 'public'
-      and tablename = 'leaderboard'
+      and tablename = 'game2_scores'
   ) then
-    alter publication supabase_realtime add table public.leaderboard;
+    alter publication supabase_realtime add table public.game2_scores;
   end if;
 end $$;
+
+-- NOTE: your original CREATE TABLE also referenced a trigger
+-- `game2_scores_updated_at` calling a function `update_game2_scores_updated_at()`,
+-- but the table as given has no `updated_at` column for that trigger to
+-- write to. If you want an updated_at column tracked automatically, add it
+-- and the trigger function, e.g.:
+--
+--   alter table public.game2_scores add column if not exists updated_at
+--     timestamp with time zone not null default now();
+--
+--   create or replace function update_game2_scores_updated_at()
+--   returns trigger as $$
+--   begin
+--     new.updated_at = now();
+--     return new;
+--   end;
+--   $$ language plpgsql;
+--
+--   drop trigger if exists game2_scores_updated_at on public.game2_scores;
+--   create trigger game2_scores_updated_at
+--     before update on public.game2_scores
+--     for each row execute function update_game2_scores_updated_at();
+--
+-- Otherwise the trigger reference in your original DDL will fail if you
+-- try to re-run it as-is (function doesn't exist yet).

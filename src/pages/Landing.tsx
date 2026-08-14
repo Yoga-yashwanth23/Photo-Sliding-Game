@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import CompassLoader from '@/components/CompassLoader';
+import { useStartVoyage } from '@/hooks/useStartVoyage';
 
 export default function Landing() {
+  const { startVoyage, isStarting } = useStartVoyage();
+
   return (
     <div className="mx-auto flex min-h-[calc(100vh-73px)] max-w-4xl flex-col items-center justify-center px-6 py-16 text-center">
       <CompassLoader size={96} />
@@ -12,9 +15,9 @@ export default function Landing() {
         Restore the Lost Treasure Map and Become the Greatest Pirate.
       </p>
       <div className="mt-10 flex flex-wrap justify-center gap-4">
-        <Link to="/login" className="btn-gold">
-          Play Now
-        </Link>
+        <button type="button" onClick={startVoyage} disabled={isStarting} className="btn-gold disabled:opacity-60">
+          {isStarting ? <CompassLoader size={20} /> : 'Get Started'}
+        </button>
         <Link to="/leaderboard" className="btn-outline">
           Leaderboard
         </Link>

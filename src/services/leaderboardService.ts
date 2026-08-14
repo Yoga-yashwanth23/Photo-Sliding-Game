@@ -22,20 +22,11 @@ export type LeaderboardListener = (entries: LeaderboardEntry[]) => void;
  * without colliding. `isNameTaken` is kept on the interface (unused by the
  * UI today) in case a future mode wants to reintroduce a uniqueness check.
  *
- * Sketch for the Supabase implementation (not wired up by default so the
- * app runs with zero configuration):
- *
- *   import { createClient } from '@supabase/supabase-js';
- *   const supabase = createClient(url, anonKey);
- *
- *   registerPlayer(name) -> supabase.from('players').insert({ player_name: name }).select().single();
- *
- *   submitResult(entry) -> supabase.from('leaderboard').insert({...});
- *
- *   subscribe(cb) -> supabase.channel('leaderboard-changes')
- *     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leaderboard' },
- *         () => this.getEntries({}).then(cb))
- *     .subscribe();
+ * Supabase implementation: see supabaseLeaderboardService.ts. It talks to
+ * `public.game2_scores`, identifies players via the Zephoria Supabase Auth
+ * session (zephoria_user_id, not a name-based lookup), and ignores the
+ * `name` argument to registerPlayer — LocalLeaderboardService below is the
+ * only implementation that still uses it, as a no-backend dev fallback.
  */
 export interface ILeaderboardService {
   isNameTaken(name: string): Promise<boolean>;
