@@ -17,6 +17,8 @@
 --     loads, and reads the user via supabase.auth.getUser().
 
 create table if not exists public.game2_scores (
+  id uuid not null default gen_random_uuid(),
+  zephoria_user_id uuid not null,
   player_name text not null,
   created_at timestamp with time zone not null default now(),
   player_id uuid null,

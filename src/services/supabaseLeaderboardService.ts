@@ -96,12 +96,11 @@ class SupabaseLeaderboardService implements ILeaderboardService {
   }
 
   async registerPlayer(): Promise<Player> {
-    // No name entry in this app anymore — identity and display name both
-    // come from the Zephoria Supabase Auth session that's expected to
-    // already be active when this game loads (shared login, not this
-    // game's job to authenticate). The `name` parameter on the interface
-    // is ignored here; LocalLeaderboardService still uses it for its
-    // no-backend dev fallback.
+    // No name entry in this app anymore — identity comes from the Zephoria
+    // Supabase Auth session that's expected to already be active when this
+    // game loads (shared login, not this game's job to authenticate). The
+    // `name` parameter on the interface is ignored here; LocalLeaderboardService
+    // still uses it for its no-backend dev fallback.
     const {
       data: { user },
       error,
@@ -111,18 +110,36 @@ class SupabaseLeaderboardService implements ILeaderboardService {
       throw new Error('No active Zephoria session — user must be logged in before playing.');
     }
 
-    // TODO: confirm which user_metadata key actually holds the display
-    // name in your Zephoria user records (this tries a few common ones,
-    // then falls back to the email, then a generic label). Adjust this
-    // chain to match your real auth.users.raw_user_meta_data shape.
-    const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-    const name =
-      (typeof meta.full_name === 'string' && meta.full_name) ||
-      (typeof meta.display_name === 'string' && meta.display_name) ||
-      (typeof meta.username === 'string' && meta.username) ||
-      (typeof meta.name === 'string' && meta.name) ||
-      user.email ||
-      'Captain';
+    // If this user already has a game2_scores row, they've played before —
+    // log them back in under that same stored name and let them keep
+    // playing against/updating that existing row (submitResult already
+    // upserts on zephoria_user_id, so no extra wiring needed there). Only
+    // fall back to deriving a name from auth metadata for a first-ever
+    // play, when no row exists yet.
+    const { data: existing, error: fetchError } = await supabase
+      .from('game2_scores')
+      .select('player_name')
+      .eq('zephoria_user_id', user.id)
+      .maybeSingle<Pick<ScoreRow, 'player_name'>>();
+    if (fetchError) throw fetchError;
+
+    let name: string;
+    if (existing?.player_name) {
+      name = existing.player_name;
+    } else {
+      // TODO: confirm which user_metadata key actually holds the display
+      // name in your Zephoria user records (this tries a few common ones,
+      // then falls back to the email, then a generic label). Adjust this
+      // chain to match your real auth.users.raw_user_meta_data shape.
+      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+      name =
+        (typeof meta.full_name === 'string' && meta.full_name) ||
+        (typeof meta.display_name === 'string' && meta.display_name) ||
+        (typeof meta.username === 'string' && meta.username) ||
+        (typeof meta.name === 'string' && meta.name) ||
+        user.email ||
+        'Captain';
+    }
 
     return {
       id: user.id,
