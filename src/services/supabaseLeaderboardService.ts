@@ -2,7 +2,18 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { LeaderboardEntry, LeaderboardFilters, Player, PlayerStatistics } from '@/types';
 import { calculatePlayerStatistics } from '@/utils/scoringEngine';
 import { supabase } from './supabaseClient';
-import type { ILeaderboardService, LeaderboardListener } from './leaderboardService';
+import { NameNotFoundError, type ILeaderboardService, type LeaderboardListener } from './leaderboardService';
+
+/**
+ * Postgres LIKE/ILIKE treats `%` and `_` as wildcards — and captain names
+ * historically allowed underscores — so an unescaped ilike on a name like
+ * "Captain_Jack" would also match "CaptainXJack". Escape both before using
+ * the name in an ilike filter so the match is exact (case-insensitive) text
+ * only.
+ */
+function escapeForIlike(value: string): string {
+  return value.replace(/[%_]/g, (c) => `\\${c}`);
+}
 
 /** Row shape of the `public.game2_scores` table (see supabase table definition). */
 interface ScoreRow {
@@ -78,12 +89,12 @@ function isWithinRange(timestamp: number, range: LeaderboardFilters['range']): b
 /**
  * Supabase-backed leaderboard, swapped in by leaderboardService.ts whenever
  * VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are set. Talks to the
- * `public.game2_scores` table, which is scoped per-user via
- * zephoria_user_id (unique, FK -> auth.users) — this game is one of
- * several sharing the same Zephoria Supabase Auth session, and does not
- * log users in itself. Uses Supabase Realtime (Postgres changes) in place
- * of the local BroadcastChannel so every connected device sees new scores
- * live.
+ * `public.game2_scores` table. Login (registerPlayer) is name-based: it
+ * looks up an existing row by player_name and reuses its zephoria_user_id
+ * as the player's identity — see the caveat in registerPlayer about RLS
+ * and Supabase Auth sessions. Uses Supabase Realtime (Postgres changes) in
+ * place of the local BroadcastChannel so every connected device sees new
+ * scores live.
  */
 class SupabaseLeaderboardService implements ILeaderboardService {
   private channel: RealtimeChannel | null = null;
@@ -95,56 +106,37 @@ class SupabaseLeaderboardService implements ILeaderboardService {
     return false;
   }
 
-  async registerPlayer(): Promise<Player> {
-    // No name entry in this app anymore — identity comes from the Zephoria
-    // Supabase Auth session that's expected to already be active when this
-    // game loads (shared login, not this game's job to authenticate). The
-    // `name` parameter on the interface is ignored here; LocalLeaderboardService
-    // still uses it for its no-backend dev fallback.
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (error) throw error;
-    if (!user) {
-      throw new Error('No active Zephoria session — user must be logged in before playing.');
-    }
-
-    // If this user already has a game2_scores row, they've played before —
-    // log them back in under that same stored name and let them keep
-    // playing against/updating that existing row (submitResult already
-    // upserts on zephoria_user_id, so no extra wiring needed there). Only
-    // fall back to deriving a name from auth metadata for a first-ever
-    // play, when no row exists yet.
-    const { data: existing, error: fetchError } = await supabase
+  async registerPlayer(name: string): Promise<Player> {
+    // Login is now purely name-based: the typed captain name must already
+    // exist as a `player_name` in game2_scores. If it does, log the player
+    // back in as that existing row's identity (its zephoria_user_id) so
+    // future submitResult calls keep upserting onto the same row. If it
+    // doesn't exist, reject — this game does not create new rows from the
+    // login form, only from data that's already on record.
+    //
+    // IMPORTANT: this does NOT establish a Supabase Auth session. If your
+    // game2_scores RLS write policies are scoped to `auth.uid() =
+    // zephoria_user_id` (see supabase/schema.sql), submitResult's
+    // insert/update will be rejected by Postgres unless a real Supabase
+    // Auth session already exists in the browser (e.g. a shared Zephoria
+    // login token) whose auth.uid() happens to equal the row's
+    // zephoria_user_id. If that's not the case here, loosen those policies
+    // back to public read/write (matching the original leaderboard table)
+    // or introduce a real sign-in step before this lookup runs.
+    const trimmed = name.trim();
+    const { data: existing, error } = await supabase
       .from('game2_scores')
-      .select('player_name')
-      .eq('zephoria_user_id', user.id)
-      .maybeSingle<Pick<ScoreRow, 'player_name'>>();
-    if (fetchError) throw fetchError;
+      .select('zephoria_user_id, player_name')
+      .ilike('player_name', escapeForIlike(trimmed))
+      .maybeSingle<Pick<ScoreRow, 'zephoria_user_id' | 'player_name'>>();
 
-    let name: string;
-    if (existing?.player_name) {
-      name = existing.player_name;
-    } else {
-      // TODO: confirm which user_metadata key actually holds the display
-      // name in your Zephoria user records (this tries a few common ones,
-      // then falls back to the email, then a generic label). Adjust this
-      // chain to match your real auth.users.raw_user_meta_data shape.
-      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-      name =
-        (typeof meta.full_name === 'string' && meta.full_name) ||
-        (typeof meta.display_name === 'string' && meta.display_name) ||
-        (typeof meta.username === 'string' && meta.username) ||
-        (typeof meta.name === 'string' && meta.name) ||
-        user.email ||
-        'Captain';
-    }
+    if (error) throw error;
+    if (!existing) throw new NameNotFoundError(trimmed);
 
     return {
-      id: user.id,
-      name: name.trim(),
-      normalisedName: name.trim().toLowerCase(),
+      id: existing.zephoria_user_id,
+      name: existing.player_name,
+      normalisedName: existing.player_name.trim().toLowerCase(),
       createdAt: Date.now(),
     };
   }

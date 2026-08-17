@@ -2,31 +2,21 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { usePlayerStore } from '@/store/playerStore';
-import { useStartVoyage } from '@/hooks/useStartVoyage';
 
 export default function Navbar() {
   const player = usePlayerStore((s) => s.player);
   const logout = usePlayerStore((s) => s.logout);
   const location = useLocation();
   const navigate = useNavigate();
-  const { startVoyage, isStarting } = useStartVoyage();
   // Every link/button that can navigate away already closes the menu on
-  // click (see navLink, handleLogout, and the Set Sail buttons below), so no
+  // click (see navLink, handleLogout, and the Set Sail links below), so no
   // separate effect is needed to sync this with the current route.
   const [menuOpen, setMenuOpen] = useState(false);
 
   function handleLogout() {
     logout();
     setMenuOpen(false);
-    navigate('/');
-  }
-
-  // "Set Sail" no longer routes to a login page — there isn't one anymore.
-  // It auto-registers a player (see useStartVoyage) the same way Landing's
-  // "Get Started" button does, then drops straight into /home.
-  function handleSetSail() {
-    setMenuOpen(false);
-    startVoyage();
+    navigate('/login');
   }
 
   const navLink = (to: string, label: string) => (
@@ -41,7 +31,7 @@ export default function Navbar() {
     </Link>
   );
 
-  const showSetSail = !player;
+  const showSetSail = !player && location.pathname !== '/login';
 
   return (
     <header className="relative z-20 border-b border-gold/20 bg-abyss/60 backdrop-blur-sm">
@@ -62,9 +52,9 @@ export default function Navbar() {
             </div>
           ) : (
             showSetSail && (
-              <button type="button" onClick={handleSetSail} disabled={isStarting} className="btn-gold text-xs disabled:opacity-60">
+              <Link to="/login" className="btn-gold text-xs">
                 Set Sail
-              </button>
+              </Link>
             )
           )}
         </div>
@@ -117,9 +107,9 @@ export default function Navbar() {
                 </div>
               ) : (
                 showSetSail && (
-                  <button type="button" onClick={handleSetSail} disabled={isStarting} className="btn-gold w-full text-xs disabled:opacity-60">
+                  <Link to="/login" className="btn-gold w-full text-xs" onClick={() => setMenuOpen(false)}>
                     Set Sail
-                  </button>
+                  </Link>
                 )
               )}
             </div>

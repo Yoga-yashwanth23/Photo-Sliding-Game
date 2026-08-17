@@ -17,16 +17,21 @@ export type LeaderboardListener = (entries: LeaderboardEntry[]) => void;
  * `SupabaseLeaderboardService` that implements the same methods and pointing
  * `leaderboardService` at it in one place. No component code changes.
  *
- * Note: captain names are NOT required to be unique. `registerPlayer` always
- * creates a fresh player record so two people can sail under the same name
- * without colliding. `isNameTaken` is kept on the interface (unused by the
- * UI today) in case a future mode wants to reintroduce a uniqueness check.
+ * Captain name login: `registerPlayer(name)` now requires that name to
+ * already exist on record — it looks the name up and logs the player back
+ * in under their existing identity (so submitResult keeps updating the same
+ * row) rather than creating a new one. If no match is found, it rejects
+ * with `NameNotFoundError` so the login form can show "name not found"
+ * rather than a generic error. `isNameTaken` is unused by the UI today.
  *
  * Supabase implementation: see supabaseLeaderboardService.ts. It talks to
- * `public.game2_scores`, identifies players via the Zephoria Supabase Auth
- * session (zephoria_user_id, not a name-based lookup), and ignores the
- * `name` argument to registerPlayer — LocalLeaderboardService below is the
- * only implementation that still uses it, as a no-backend dev fallback.
+ * `public.game2_scores`, looking players up by `player_name` and returning
+ * their stored `zephoria_user_id` as the player's identity.
+ * LocalLeaderboardService below is the no-backend dev fallback and, unlike
+ * the Supabase version, still creates a new record for an unrecognised name
+ * — there's no separate provisioning step in local/device-only mode, so
+ * requiring pre-existing names there would make it impossible to ever log
+ * in during local development.
  */
 export interface ILeaderboardService {
   isNameTaken(name: string): Promise<boolean>;
@@ -35,6 +40,14 @@ export interface ILeaderboardService {
   getEntries(filters?: Partial<LeaderboardFilters>): Promise<LeaderboardEntry[]>;
   getPlayerStatistics(playerId: string): Promise<PlayerStatistics | null>;
   subscribe(listener: LeaderboardListener): () => void;
+}
+
+/** Thrown by `registerPlayer` when the entered captain name has no existing record. */
+export class NameNotFoundError extends Error {
+  constructor(name: string) {
+    super(`No captain named "${name}" was found.`);
+    this.name = 'NameNotFoundError';
+  }
 }
 
 function normalise(name: string): string {
@@ -113,12 +126,19 @@ class LocalLeaderboardService implements ILeaderboardService {
   }
 
   async registerPlayer(name: string): Promise<Player> {
-    // Names are intentionally not deduplicated: every login creates its own
-    // player record, so two different people can both play as "Jack".
+    // Local/device-only dev fallback: unlike SupabaseLeaderboardService,
+    // this still creates a fresh record for a name it hasn't seen before
+    // rather than rejecting it — see the interface doc comment above for
+    // why. Names are also not deduplicated: every unrecognised name here
+    // creates its own player record.
+    const target = normalise(name);
+    const existingPlayer = this.getPlayers().find((p) => p.normalisedName === target);
+    if (existingPlayer) return existingPlayer;
+
     const player: Player = {
       id: crypto.randomUUID(),
       name: name.trim(),
-      normalisedName: normalise(name),
+      normalisedName: target,
       createdAt: Date.now(),
     };
     const players = [...this.getPlayers(), player];

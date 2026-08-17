@@ -6,18 +6,17 @@ import Navbar from '@/components/Navbar';
 import OceanBackground from '@/components/OceanBackground';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import Landing from '@/pages/Landing';
+import Login from '@/pages/Login';
 import Home from '@/pages/Home';
 import Game from '@/pages/Game';
 import LeaderboardPage from '@/pages/LeaderboardPage';
 import { unlockAudio, playButtonClickSound } from '@/services/soundService';
 
 function RequireCaptain({ children }: { children: React.ReactElement }) {
-  // There's no login page anymore — a player is created automatically the
-  // moment someone clicks "Get Started" / "Set Sail" (see useStartVoyage).
-  // If somehow no player exists yet, send them back to the landing page,
-  // which is the only place that can create one.
+  // A player is only ever set by successfully logging in with an existing
+  // captain name (see LoginForm) — if none is set, send them to /login.
   const player = usePlayerStore((s) => s.player);
-  if (!player) return <Navigate to="/" replace />;
+  if (!player) return <Navigate to="/login" replace />;
   return children;
 }
 
@@ -50,6 +49,7 @@ function AnimatedRoutes() {
     >
       <Routes location={location}>
         <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
         <Route
           path="/home"
           element={
