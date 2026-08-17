@@ -9,10 +9,13 @@ interface CompletionModalProps {
   performance: PerformanceResult;
   rank: number | null;
   isPersonalBest: boolean;
+  submissionError?: string | null;
+  isSubmitting?: boolean;
+  onRetrySubmit?: () => void;
   onPlayAgain: () => void;
 }
 
-export default function CompletionModal({ completionTimeMs, moves, performance, rank, isPersonalBest, onPlayAgain }: CompletionModalProps) {
+export default function CompletionModal({ completionTimeMs, moves, performance, rank, isPersonalBest, submissionError, isSubmitting, onRetrySubmit, onPlayAgain }: CompletionModalProps) {
   const navigate = useNavigate();
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-abyss/80 px-4" role="dialog" aria-modal="true">
@@ -24,6 +27,16 @@ export default function CompletionModal({ completionTimeMs, moves, performance, 
         <div className="mb-5 rounded-lg bg-gold/15 px-4 py-3"><span className="text-xs uppercase tracking-widest text-abyss/60">Final Score · Grade {performance.letterGrade}</span><p className="font-mono text-4xl text-abyss">{performance.finalScore.toFixed(2)}<span className="text-lg"> / 100</span></p>{isPersonalBest && <p className="text-xs font-heading text-rust">New personal best!</p>}</div>
         <dl className="mb-5 grid grid-cols-2 gap-3 text-left"><Stat label="Time" value={formatTime(completionTimeMs)} /><Stat label="Moves" value={`${moves} / ${performance.expectedMinimumMoves}`} /><Stat label="Accuracy" value={`${performance.accuracyScore.toFixed(2)}%`} /><Stat label="Leaderboard" value={rank ? `#${rank}` : '—'} /></dl>
         <div className="mb-6 space-y-3 text-left"><PerformanceBar label="Move Efficiency" value={performance.moveEfficiency} delay={0.35} /><PerformanceBar label="Completion Time" value={performance.timeScore} delay={0.5} /><PerformanceBar label="Accuracy" value={performance.accuracyScore} delay={0.65} /></div>
+        {submissionError && (
+          <div role="alert" className="mb-4 rounded-md border border-rust/40 bg-rust/10 px-3 py-2 text-left text-xs text-rust">
+            <p className="mb-1">{submissionError}</p>
+            {onRetrySubmit && (
+              <button type="button" onClick={onRetrySubmit} disabled={isSubmitting} className="font-heading underline underline-offset-2 disabled:opacity-60">
+                {isSubmitting ? 'Retrying…' : 'Retry saving score'}
+              </button>
+            )}
+          </div>
+        )}
         <div className="flex flex-wrap justify-center gap-3"><button onClick={onPlayAgain} className="btn-gold">Play Again</button><button onClick={() => navigate('/leaderboard')} className="btn-outline !text-abyss !border-abyss/30 hover:!bg-abyss/5">Leaderboard</button><button onClick={() => navigate('/home')} className="btn-outline !text-abyss !border-abyss/30 hover:!bg-abyss/5">Home</button></div>
       </motion.div>
     </div>

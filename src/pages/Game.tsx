@@ -34,6 +34,8 @@ export default function Game() {
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [isPersonalBest, setIsPersonalBest] = useState(false);
   const [showGuidelines, setShowGuidelines] = useState(true);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [isSubmittingResult, setIsSubmittingResult] = useState(false);
 
   const selectedImageId = imageId ? Number(imageId) : null;
 
@@ -75,9 +77,11 @@ export default function Game() {
     setShowGuidelines(true);
   }, [selectedImageId]);
 
-  useEffect(() => {
-    async function persist() {
-      if (!isSolved || hasSubmitted || !player) return;
+  async function persistResult() {
+    if (!isSolved || hasSubmitted || !player || isSubmittingResult) return;
+    setIsSubmittingResult(true);
+    setSubmissionError(null);
+    try {
       const previousStats = await leaderboardService.getPlayerStatistics(player.id);
       const saved = await submitResult({
         playerId: player.id,
@@ -95,8 +99,23 @@ export default function Game() {
       });
       setIsPersonalBest(!previousStats || performance.finalScore > previousStats.personalBestScore);
       markSubmitted(saved?.rank ?? null);
+    } catch (err) {
+      // Previously this rejection went uncaught: hasSubmitted never got set,
+      // the leaderboard silently kept its old value, and the player saw no
+      // indication anything had gone wrong. Most common cause is Supabase
+      // Row Level Security rejecting the write — see
+      // supabase/fix_rls_for_name_login.sql.
+      // eslint-disable-next-line no-console
+      console.error('[Game] could not save score to leaderboard:', err);
+      setSubmissionError('Could not save your score. Check your connection and try again.');
+    } finally {
+      setIsSubmittingResult(false);
     }
-    persist();
+  }
+
+  useEffect(() => {
+    persistResult();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSolved, hasSubmitted, player, elapsedMs, moves, performance, submitResult, markSubmitted]);
 
   function handleEndGame() {
@@ -184,6 +203,9 @@ export default function Game() {
           performance={performance}
           rank={finalRank}
           isPersonalBest={isPersonalBest}
+          submissionError={submissionError}
+          isSubmitting={isSubmittingResult}
+          onRetrySubmit={persistResult}
           onPlayAgain={() => {
             const puzzleImage = images.find((img) => img.id === selectedImageId);
             if (puzzleImage) startGame(puzzleImage);
