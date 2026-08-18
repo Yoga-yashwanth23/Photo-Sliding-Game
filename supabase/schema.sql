@@ -8,12 +8,6 @@
 -- the table already exists (IF NOT EXISTS); it's here for reference/setting
 -- up a fresh environment, not something you need to run again.
 --
--- IMPORTANT: for RLS policies, the player_name-lock trigger, and the
--- gamer_profile -> game2_scores auto-seed trigger, run
--- 2026_08_align_auth_based_login.sql in this same folder instead — it
--- supersedes the policies below and the now-removed
--- fix_rls_for_name_login.sql / fix_rerun.sql.
---
 -- Key differences from the old `leaderboard` table:
 --   - One row per *authenticated Zephoria user* (zephoria_user_id, unique,
 --     FK -> auth.users), not per anonymous locally-generated player id.
@@ -45,27 +39,30 @@ create table if not exists public.game2_scores (
 
 create index if not exists idx_game2_scores_user on public.game2_scores using btree (zephoria_user_id);
 
--- Row Level Security: see 2026_08_align_auth_based_login.sql for the
--- current policies — it replaces everything below this line. Left here
--- only as a historical record of the table's very first RLS setup.
---
--- alter table public.game2_scores enable row level security;
---
--- drop policy if exists "Public read access" on public.game2_scores;
--- create policy "Public read access"
---   on public.game2_scores for select
---   using (true);
---
--- drop policy if exists "Users insert their own score" on public.game2_scores;
--- create policy "Users insert their own score"
---   on public.game2_scores for insert
---   with check (auth.uid() = zephoria_user_id);
---
--- drop policy if exists "Users update their own score" on public.game2_scores;
--- create policy "Users update their own score"
---   on public.game2_scores for update
---   using (auth.uid() = zephoria_user_id)
---   with check (auth.uid() = zephoria_user_id);
+-- Row Level Security: now that every row is tied to a real authenticated
+-- user, scope reads/writes to that user's own row instead of leaving the
+-- table open to anyone with the anon key (which is what the old, auth-less
+-- `leaderboard` table policies did). Leaderboard/statistics reads that need
+-- to see *other* players' scores (Leaderboard.tsx, getEntries) rely on the
+-- public-read policy below — tighten this if the leaderboard should only be
+-- visible to logged-in users.
+alter table public.game2_scores enable row level security;
+
+drop policy if exists "Public read access" on public.game2_scores;
+create policy "Public read access"
+  on public.game2_scores for select
+  using (true);
+
+drop policy if exists "Users insert their own score" on public.game2_scores;
+create policy "Users insert their own score"
+  on public.game2_scores for insert
+  with check (auth.uid() = zephoria_user_id);
+
+drop policy if exists "Users update their own score" on public.game2_scores;
+create policy "Users update their own score"
+  on public.game2_scores for update
+  using (auth.uid() = zephoria_user_id)
+  with check (auth.uid() = zephoria_user_id);
 
 -- Realtime: lets every open tab/device see new scores immediately,
 -- replacing the BroadcastChannel trick the local version used. Only add

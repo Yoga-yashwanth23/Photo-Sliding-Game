@@ -13,12 +13,10 @@ export default function Navbar() {
   // separate effect is needed to sync this with the current route.
   const [menuOpen, setMenuOpen] = useState(false);
 
-  async function handleLogout() {
-    // Ends the shared Zephoria session, not just this game — the player is
-    // logged out of the whole site, same as if they'd clicked logout there.
-    await logout();
+  function handleLogout() {
+    logout();
     setMenuOpen(false);
-    navigate('/');
+    navigate('/login');
   }
 
   const navLink = (to: string, label: string) => (

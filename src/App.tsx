@@ -5,7 +5,6 @@ import { usePlayerStore } from '@/store/playerStore';
 import Navbar from '@/components/Navbar';
 import OceanBackground from '@/components/OceanBackground';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import CompassLoader from '@/components/CompassLoader';
 import Landing from '@/pages/Landing';
 import Login from '@/pages/Login';
 import Home from '@/pages/Home';
@@ -14,20 +13,10 @@ import LeaderboardPage from '@/pages/LeaderboardPage';
 import { unlockAudio, playButtonClickSound } from '@/services/soundService';
 
 function RequireCaptain({ children }: { children: React.ReactElement }) {
-  // Identity comes from the shared Zephoria session + gamer_profile (see
-  // playerStore.ts) — this game never asks for a name itself. 'ready' is
-  // the only status that means "go ahead and render the game"; everything
-  // else (still checking, no session, no profile on record) sends the
-  // player to /login, which shows the right message for that status.
-  const status = usePlayerStore((s) => s.status);
-  if (status === 'loading') {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <CompassLoader label="Checking your papers…" />
-      </div>
-    );
-  }
-  if (status !== 'ready') return <Navigate to="/login" replace />;
+  // A player is only ever set by successfully logging in with an existing
+  // captain name (see LoginForm) — if none is set, send them to /login.
+  const player = usePlayerStore((s) => s.player);
+  if (!player) return <Navigate to="/login" replace />;
   return children;
 }
 
@@ -85,16 +74,6 @@ function AnimatedRoutes() {
 }
 
 export default function App() {
-  // Resolve who's playing exactly once when the game tab mounts: check the
-  // shared Supabase Auth session, then read the captain name already on
-  // record in gamer_profile. playerStore.refresh() also gets re-run
-  // automatically on any future auth state change (see playerStore.ts), so
-  // this effect only needs to fire the first check.
-  const refreshPlayer = usePlayerStore((s) => s.refresh);
-  useEffect(() => {
-    refreshPlayer();
-  }, [refreshPlayer]);
-
   // Play the button-click sound for every <button> in the app, in one place,
   // instead of wiring it into each button individually. A capture-phase
   // listener on window fires the instant the click happens — same tick as

@@ -1,4 +1,4 @@
-import type { LeaderboardEntry, LeaderboardFilters, PlayerStatistics } from '@/types';
+import type { LeaderboardEntry, LeaderboardFilters, Player, PlayerStatistics } from '@/types';
 import { storageService } from './storageService';
 import { STORAGE_KEYS } from '@/constants';
 import { calculatePlayerStatistics } from '@/utils/scoringEngine';
@@ -8,7 +8,7 @@ import { supabaseLeaderboardService } from './supabaseLeaderboardService';
 export type LeaderboardListener = (entries: LeaderboardEntry[]) => void;
 
 /**
- * Backend-agnostic contract for leaderboard persistence.
+ * Backend-agnostic contract for player identity + leaderboard persistence.
  *
  * The rest of the app (stores, hooks, components) depends only on this
  * interface. Today it's backed by `LocalLeaderboardService` (localStorage +
@@ -17,22 +17,41 @@ export type LeaderboardListener = (entries: LeaderboardEntry[]) => void;
  * `SupabaseLeaderboardService` that implements the same methods and pointing
  * `leaderboardService` at it in one place. No component code changes.
  *
- * Player identity is no longer this service's concern — it's resolved
- * once, up front, by `playerStore` + `gamerProfileService` from the shared
- * Zephoria Supabase Auth session and the one-time `gamer_profile.player_name`
- * row. Every method here just takes/returns a `playerId` (== auth.uid()) and
- * assumes identity has already been established.
+ * Captain name login: `registerPlayer(name)` now requires that name to
+ * already exist on record — it looks the name up and logs the player back
+ * in under their existing identity (so submitResult keeps updating the same
+ * row) rather than creating a new one. If no match is found, it rejects
+ * with `NameNotFoundError` so the login form can show "name not found"
+ * rather than a generic error. `isNameTaken` is unused by the UI today.
  *
  * Supabase implementation: see supabaseLeaderboardService.ts. It talks to
- * `public.game2_scores`, upserting on `zephoria_user_id` (== playerId).
- * LocalLeaderboardService below remains the no-backend dev fallback for
- * running the app with zero configuration.
+ * `public.game2_scores`, looking players up by `player_name` and returning
+ * their stored `zephoria_user_id` as the player's identity.
+ * LocalLeaderboardService below is the no-backend dev fallback and, unlike
+ * the Supabase version, still creates a new record for an unrecognised name
+ * — there's no separate provisioning step in local/device-only mode, so
+ * requiring pre-existing names there would make it impossible to ever log
+ * in during local development.
  */
 export interface ILeaderboardService {
+  isNameTaken(name: string): Promise<boolean>;
+  registerPlayer(name: string): Promise<Player>;
   submitResult(entry: Omit<LeaderboardEntry, 'id'>): Promise<LeaderboardEntry>;
   getEntries(filters?: Partial<LeaderboardFilters>): Promise<LeaderboardEntry[]>;
   getPlayerStatistics(playerId: string): Promise<PlayerStatistics | null>;
   subscribe(listener: LeaderboardListener): () => void;
+}
+
+/** Thrown by `registerPlayer` when the entered captain name has no existing record. */
+export class NameNotFoundError extends Error {
+  constructor(name: string) {
+    super(`No captain named "${name}" was found.`);
+    this.name = 'NameNotFoundError';
+  }
+}
+
+function normalise(name: string): string {
+  return name.trim().toLowerCase();
 }
 
 /**
@@ -86,6 +105,10 @@ class LocalLeaderboardService implements ILeaderboardService {
     });
   }
 
+  private getPlayers(): Player[] {
+    return storageService.get<Player[]>(STORAGE_KEYS.players) ?? [];
+  }
+
   private getRawEntries(): LeaderboardEntry[] {
     const stored = storageService.get<unknown[]>(STORAGE_KEYS.leaderboard) ?? [];
     const valid = stored.filter(isValidLeaderboardEntry);
@@ -95,6 +118,32 @@ class LocalLeaderboardService implements ILeaderboardService {
       storageService.set(STORAGE_KEYS.leaderboard, valid);
     }
     return valid;
+  }
+
+  async isNameTaken(name: string): Promise<boolean> {
+    const target = normalise(name);
+    return this.getPlayers().some((p) => p.normalisedName === target);
+  }
+
+  async registerPlayer(name: string): Promise<Player> {
+    // Local/device-only dev fallback: unlike SupabaseLeaderboardService,
+    // this still creates a fresh record for a name it hasn't seen before
+    // rather than rejecting it — see the interface doc comment above for
+    // why. Names are also not deduplicated: every unrecognised name here
+    // creates its own player record.
+    const target = normalise(name);
+    const existingPlayer = this.getPlayers().find((p) => p.normalisedName === target);
+    if (existingPlayer) return existingPlayer;
+
+    const player: Player = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      normalisedName: target,
+      createdAt: Date.now(),
+    };
+    const players = [...this.getPlayers(), player];
+    storageService.set(STORAGE_KEYS.players, players);
+    return player;
   }
 
   async submitResult(entry: Omit<LeaderboardEntry, 'id'>): Promise<LeaderboardEntry> {
