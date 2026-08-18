@@ -13,8 +13,9 @@ import LeaderboardPage from '@/pages/LeaderboardPage';
 import { unlockAudio, playButtonClickSound } from '@/services/soundService';
 
 function RequireCaptain({ children }: { children: React.ReactElement }) {
-  // A player is only ever set by successfully logging in with an existing
-  // captain name (see LoginForm) — if none is set, send them to /login.
+  // A player is only ever set once /login has resolved a Supabase session
+  // to a gamer_profile row (see pages/Login.tsx) — if none is set, send
+  // them there to bootstrap it rather than showing this page half-loaded.
   const player = usePlayerStore((s) => s.player);
   if (!player) return <Navigate to="/login" replace />;
   return children;

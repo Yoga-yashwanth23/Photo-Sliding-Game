@@ -1,3 +1,8 @@
+-- SUPERSEDED: see supabase/gamer_profile.sql, which re-tightens these
+-- policies back to auth.uid()-scoped now that the game establishes a real
+-- Supabase Auth session before writing (session handoff + gamer_profile).
+-- Kept here only as a record of why the policies were briefly public.
+--
 -- Fix: this app's login is name-based (see supabaseLeaderboardService.ts
 -- registerPlayer) — it looks up an existing player_name and never creates
 -- a real Supabase Auth session. That means auth.uid() is always null in
