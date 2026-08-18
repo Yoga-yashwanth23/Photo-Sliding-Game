@@ -1,19 +1,8 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { LeaderboardEntry, LeaderboardFilters, Player, PlayerStatistics } from '@/types';
+import type { LeaderboardEntry, LeaderboardFilters, PlayerStatistics } from '@/types';
 import { calculatePlayerStatistics } from '@/utils/scoringEngine';
 import { supabase } from './supabaseClient';
-import { NameNotFoundError, type ILeaderboardService, type LeaderboardListener } from './leaderboardService';
-
-/**
- * Postgres LIKE/ILIKE treats `%` and `_` as wildcards — and captain names
- * historically allowed underscores — so an unescaped ilike on a name like
- * "Captain_Jack" would also match "CaptainXJack". Escape both before using
- * the name in an ilike filter so the match is exact (case-insensitive) text
- * only.
- */
-function escapeForIlike(value: string): string {
-  return value.replace(/[%_]/g, (c) => `\\${c}`);
-}
+import type { ILeaderboardService, LeaderboardListener } from './leaderboardService';
 
 /** Row shape of the `public.game2_scores` table (see supabase table definition). */
 interface ScoreRow {
@@ -37,9 +26,9 @@ function fromRow(row: ScoreRow): LeaderboardEntry {
   return {
     id: row.id,
     // The app's generic "playerId" concept is now the real Zephoria auth
-    // user id — see registerPlayer() below, which sets Player.id to
-    // supabase.auth.getUser()'s id. That's also what's unique-constrained
-    // on game2_scores (one row per user), so it doubles as the upsert key.
+    // user id — resolved by playerStore.ts via supabase.auth.getUser().
+    // That's also what's unique-constrained on game2_scores (one row per
+    // user), so it doubles as the upsert key.
     playerId: row.zephoria_user_id,
     playerName: row.player_name,
     completionTimeMs: row.completion_time_ms ?? 0,
@@ -89,57 +78,22 @@ function isWithinRange(timestamp: number, range: LeaderboardFilters['range']): b
 /**
  * Supabase-backed leaderboard, swapped in by leaderboardService.ts whenever
  * VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are set. Talks to the
- * `public.game2_scores` table. Login (registerPlayer) is name-based: it
- * looks up an existing row by player_name and reuses its zephoria_user_id
- * as the player's identity — see the caveat in registerPlayer about RLS
- * and Supabase Auth sessions. Uses Supabase Realtime (Postgres changes) in
- * place of the local BroadcastChannel so every connected device sees new
- * scores live.
+ * `public.game2_scores` table, keyed on `zephoria_user_id` — the real
+ * Supabase Auth user id resolved up front by playerStore.ts +
+ * gamerProfileService.ts, not anything this service looks up itself.
+ * `entry.playerId` passed in below is always that auth.uid(). Uses Supabase
+ * Realtime (Postgres changes) in place of the local BroadcastChannel so
+ * every connected device sees new scores live.
+ *
+ * A `gamer_profile` insert already seeds a zero-score `game2_scores` row
+ * for this user (see the create_game2_score_record_trigger on
+ * gamer_profile), so submitResult below is really always an UPDATE onto an
+ * existing row — the upsert just means it also works correctly if that row
+ * is ever missing.
  */
 class SupabaseLeaderboardService implements ILeaderboardService {
   private channel: RealtimeChannel | null = null;
   private listeners = new Set<LeaderboardListener>();
-
-  async isNameTaken(): Promise<boolean> {
-    // Captain names are intentionally not unique (see leaderboardService.ts
-    // interface docs) — nothing on the UI calls this today.
-    return false;
-  }
-
-  async registerPlayer(name: string): Promise<Player> {
-    // Login is now purely name-based: the typed captain name must already
-    // exist as a `player_name` in game2_scores. If it does, log the player
-    // back in as that existing row's identity (its zephoria_user_id) so
-    // future submitResult calls keep upserting onto the same row. If it
-    // doesn't exist, reject — this game does not create new rows from the
-    // login form, only from data that's already on record.
-    //
-    // IMPORTANT: this does NOT establish a Supabase Auth session. If your
-    // game2_scores RLS write policies are scoped to `auth.uid() =
-    // zephoria_user_id` (see supabase/schema.sql), submitResult's
-    // insert/update will be rejected by Postgres unless a real Supabase
-    // Auth session already exists in the browser (e.g. a shared Zephoria
-    // login token) whose auth.uid() happens to equal the row's
-    // zephoria_user_id. If that's not the case here, loosen those policies
-    // back to public read/write (matching the original leaderboard table)
-    // or introduce a real sign-in step before this lookup runs.
-    const trimmed = name.trim();
-    const { data: existing, error } = await supabase
-      .from('game2_scores')
-      .select('zephoria_user_id, player_name')
-      .ilike('player_name', escapeForIlike(trimmed))
-      .maybeSingle<Pick<ScoreRow, 'zephoria_user_id' | 'player_name'>>();
-
-    if (error) throw error;
-    if (!existing) throw new NameNotFoundError(trimmed);
-
-    return {
-      id: existing.zephoria_user_id,
-      name: existing.player_name,
-      normalisedName: existing.player_name.trim().toLowerCase(),
-      createdAt: Date.now(),
-    };
-  }
 
   async submitResult(entry: Omit<LeaderboardEntry, 'id'>): Promise<LeaderboardEntry> {
     const { data: existing, error: fetchError } = await supabase
