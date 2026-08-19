@@ -4,20 +4,25 @@ import { supabase } from './supabaseClient';
 /**
  * `gamer_profile` is the source of truth for "does this authenticated user
  * already have a captain name?" — separate from `game2_scores`, which is
- * score data. One row per Supabase Auth user (user_id, PK, FK -> auth.users),
+ * score data. One row per Supabase Auth user (id, PK, FK -> auth.users),
  * written once and never updated (see supabase/gamer_profile.sql — there's
  * deliberately no UPDATE policy, so the name is immutable at the database
  * level, not just in the UI).
+ *
+ * NOTE: the primary key / FK-to-auth.users column on the live table is
+ * named `id` (not `user_id` — that was an earlier draft name that never
+ * matched what actually got created in Supabase). Keep this file's column
+ * names in sync with supabase/gamer_profile.sql.
  */
 
 interface GamerProfileRow {
-  user_id: string;
+  id: string;
   player_name: string;
 }
 
 function toPlayer(row: GamerProfileRow): Player {
   return {
-    id: row.user_id,
+    id: row.id,
     name: row.player_name,
     normalisedName: row.player_name.trim().toLowerCase(),
     createdAt: Date.now(),
@@ -32,8 +37,8 @@ function toPlayer(row: GamerProfileRow): Player {
 export async function fetchGamerProfile(userId: string): Promise<Player | null> {
   const { data, error } = await supabase
     .from('gamer_profile')
-    .select('user_id, player_name')
-    .eq('user_id', userId)
+    .select('id, player_name')
+    .eq('id', userId)
     .maybeSingle<GamerProfileRow>();
 
   if (error) throw error;
@@ -50,7 +55,7 @@ export async function fetchGamerProfile(userId: string): Promise<Player | null> 
  *
  * If `gamer_profile` already has a row for this user (e.g. a double
  * submit, or the name form re-rendering after a slow network response),
- * the unique primary key on user_id causes the insert to fail — callers
+ * the unique primary key on id causes the insert to fail — callers
  * should treat that as "someone already has a name, go re-fetch it" rather
  * than a hard error.
  */
@@ -59,8 +64,8 @@ export async function createGamerProfile(userId: string, name: string): Promise<
 
   const { data, error } = await supabase
     .from('gamer_profile')
-    .insert({ user_id: userId, player_name: trimmed })
-    .select('user_id, player_name')
+    .insert({ id: userId, player_name: trimmed })
+    .select('id, player_name')
     .single<GamerProfileRow>();
 
   if (error) throw error;
